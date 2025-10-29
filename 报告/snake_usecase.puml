@@ -1,0 +1,114 @@
+@startuml 蛇对蛇游戏用例图
+
+left to right direction
+skinparam packageStyle rectangle
+
+title 蛇对蛇游戏用例图
+
+' 定义参与者
+actor "玩家" as Player
+
+rectangle "蛇对蛇游戏系统" {
+  
+  ' 用户管理
+  package "用户管理" {
+    usecase "创建用户" as UC0_1
+    usecase "选择用户" as UC0_2
+    usecase "删除用户" as UC0_3
+    usecase "查看用户信息" as UC0_4
+  }
+  
+  ' 游戏设置
+  package "游戏设置" {
+    usecase "选择游戏模式" as UC1
+    usecase "设置游戏速度" as UC2
+    usecase "选择AI难度" as UC3
+  }
+  
+  ' 游戏控制
+  package "游戏控制" {
+    usecase "开始游戏" as UC4
+    usecase "暂停/继续游戏" as UC5
+    usecase "重置游戏" as UC6
+    usecase "控制蛇移动" as UC7
+    usecase "AI控制蛇移动" as UC22
+  }
+  
+  ' 游戏核心逻辑
+  package "游戏核心逻辑" {
+    usecase "游戏进行" as UC8
+    usecase "吃豆子" as UC9
+    usecase "处理死亡与重生事件" as UC10
+    usecase "加速效果" as UC11
+    usecase "超级豆子效果" as UC12
+    usecase "触碰地雷" as UC13
+    usecase "磁铁吸取效果" as UC14
+    usecase "豆子刷新" as UC18
+    usecase "碰撞检测" as UC19
+    usecase "更新分数" as UC20
+    usecase "死亡掉落豆子" as UC21
+  }
+  
+  ' 信息查看
+  package "信息查看" {
+    usecase "显示实时信息" as UC15
+    usecase "查看成就系统" as UC16
+    usecase "查看已解锁成就" as UC16_1
+    usecase "查看成就进度" as UC16_2
+    usecase "成就解锁通知" as UC16_3
+    usecase "查看游戏指南" as UC17
+  }
+}
+
+' 玩家与用例的关系
+' 用户管理
+Player --> UC0_1 : 创建
+Player --> UC0_2 : 选择
+Player --> UC0_3 : 删除
+Player --> UC0_4 : 查看
+
+' 游戏设置与控制
+Player --> UC1 : 选择
+Player --> UC2 : 设置
+Player --> UC4 : 触发
+Player --> UC5 : 操作
+Player --> UC6 : 触发
+Player --> UC7 : WASD/方向键
+
+' 信息查看
+Player --> UC16 : 查看
+Player --> UC17 : 查看
+
+' 用例之间的关系
+UC1 ..> UC3 : <<extend>>
+
+UC4 ..> UC8 : <<include>>
+UC5 ..> UC8 : <<extend>>
+
+UC8 ..> UC7 : <<include>>
+UC8 ..> UC22 : <<include>>
+UC8 ..> UC15 : <<include>>
+UC8 ..> UC18 : <<include>>
+UC8 ..> UC19 : <<include>>
+
+UC8 ..> UC9 : <<include>>
+UC9 ..> UC20 : <<include>>
+UC9 ..> UC11 : <<extend>>
+UC9 ..> UC12 : <<extend>>
+UC9 ..> UC13 : <<extend>>
+UC9 ..> UC14 : <<extend>>
+
+UC8 ..> UC10 : <<extend>>
+UC10 ..> UC20 : <<include>>
+UC10 ..> UC21 : <<include>>
+
+' 成就系统关系
+UC16 ..> UC16_1 : <<include>>
+UC16 ..> UC16_2 : <<include>>
+UC8 ..> UC16_3 : <<extend>>
+
+' 用户管理关系
+UC4 ..> UC0_2 : <<include>>
+UC0_4 ..> UC16 : <<include>>
+
+@enduml

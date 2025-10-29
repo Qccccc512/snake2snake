@@ -1,0 +1,320 @@
+@startuml 蛇对蛇游戏简化类图
+
+title 蛇对蛇游戏 - 简化类图
+
+skinparam classAttributeIconSize 0
+skinparam groupInheritance 2
+
+' ========== 核心控制层 ==========
+package "核心控制" <<Rectangle>> {
+    class Game {
+        - state: String
+        - session: GameSession
+        - snakes: Snake[2]
+        - lastUpdate: Number
+        --
+        + setupSession(mode, user1, user2, difficulty)
+        + start()
+        + pause()
+        + reset()
+        + end()
+        - update(time)
+    }
+
+    class GameSession {
+        - player1User: User
+        - player2User: User
+        - gameMode: String
+        - aiDifficulty: String
+        --
+        + setupSinglePlayer(user, difficulty)
+        + setupTwoPlayers(user1, user2)
+        + isAIMode(): Boolean
+    }
+}
+
+' ========== 用户与统计 ==========
+package "用户管理" <<Rectangle>> {
+    class User {
+        - userId: String
+        - userName: String
+        - stats: GameStats
+        - achievements: Achievement[]
+        --
+        + updateStats(statsDelta)
+        + unlockAchievement(id): Boolean
+        + getLevel(): Number
+    }
+
+    class GameStats {
+        - totalGames: Number
+        - totalWins: Number
+        - totalFoodEaten: Number
+        - currentDistance: Number
+        --
+        + recordMove()
+        + recordFoodEaten(type)
+        + endGame(isWin)
+        + resetSession()
+    }
+
+    class UserManager <<Singleton>> {
+        - users: Map
+        --
+        + createUser(name): User
+        + getUser(id): User
+        + saveAllUsers()
+        + loadAllUsers()
+    }
+}
+
+' ========== 游戏实体 ==========
+package "游戏实体" <<Rectangle>> {
+    class Snake {
+        - body: Position[]
+        - direction: Direction
+        - isAlive: Boolean
+        - foodEaten: Number
+        - speedMultiplier: Number
+        - effects: SnakeEffect[]
+        --
+        + move()
+        + changeDirection(dir)
+        + die(type)
+        + respawn(x, y, dir)
+        + addEffect(effect)
+    }
+
+    abstract class Food {
+        # position: Position
+        # type: String
+        # color: String
+        --
+        + {abstract} onEaten(snake, game)
+        + render(ctx, cellSize)
+    }
+
+    class NormalFood {
+        + onEaten(snake, game)
+    }
+
+    class SpeedFood {
+        + onEaten(snake, game)
+    }
+
+    class SuperFood {
+        + onEaten(snake, game)
+    }
+
+    class MineFood {
+        + onEaten(snake, game)
+    }
+
+    class MagnetFood {
+        + onEaten(snake, game)
+    }
+
+    abstract class SnakeEffect {
+        # type: String
+        # duration: Number
+        --
+        + {abstract} apply(snake)
+        + update(snake, game)
+        + isExpired(): Boolean
+    }
+
+    class Position {
+        + x: Number
+        + y: Number
+        --
+        + equals(other): Boolean
+        + clone(): Position
+    }
+}
+
+' ========== 游戏管理器 ==========
+package "游戏管理器" <<Rectangle>> {
+    class FoodSpawner {
+        - foods: Food[]
+        - spawnTimer: Timer
+        --
+        + startSpawning()
+        + spawnFood(count)
+        + dropFoodFromSnake(snake)
+        + removeFood(food)
+    }
+
+    class FoodFactory <<Factory>> {
+        --
+        + createFood(position): Food
+        + createFoodByType(type, position): Food
+        + selectFoodType(): String
+    }
+
+    class CollisionDetector <<Singleton>> {
+        --
+        + checkWallCollision(snake): Boolean
+        + checkSelfCollision(snake): Boolean
+        + checkHeadToHeadCollision(s1, s2): Boolean
+        + detectAllCollisions(snakes): Object
+    }
+
+    class RespawnManager {
+        - respawnQueue: Array
+        --
+        + handleDeath(snake, type)
+        + update(deltaTime)
+        + findSafeRespawnPosition(): Object
+    }
+
+    class ScoreManager {
+        --
+        + calculateScore(snake): Number
+        + determineWinner(snakes): Number
+    }
+
+    class Timer {
+        - timeRemaining: Number
+        - isRunning: Boolean
+        --
+        + start()
+        + pause()
+        + reset()
+        + getRemainingTime(): Number
+    }
+
+    class AchievementSystem {
+        - newlyUnlockedAchievements: Array
+        --
+        + checkAchievements(user, type): Achievement[]
+        + queueAchievementNotification(achievement, user)
+    }
+}
+
+' ========== AI系统 ==========
+package "AI系统" <<Rectangle>> {
+    abstract class AIController {
+        # game: Game
+        # difficulty: String
+        --
+        + {abstract} makeDecision(snake): Direction
+        # findNearestFood(position): Food
+    }
+
+    class EasyAI {
+        + makeDecision(snake): Direction
+    }
+
+    class NormalAI {
+        + makeDecision(snake): Direction
+    }
+
+    class HardAI {
+        + makeDecision(snake): Direction
+    }
+}
+
+' ========== 渲染与交互 ==========
+package "渲染与交互" <<Rectangle>> {
+    class Renderer {
+        - canvas: Canvas
+        - ctx: Context
+        --
+        + render(game)
+        + renderSnake(snake)
+        + renderFood(foods)
+    }
+
+    class UIManager {
+        --
+        + updateScore(snakes)
+        + updateTimer(time)
+        + showGameResult(winner)
+        + showAchievementNotification(achievement)
+    }
+
+    class InputHandler {
+        --
+        + handleKeyPress(event)
+        + bindVirtualButtons()
+    }
+}
+
+' ========== 配置 ==========
+class GameConfig <<Singleton>> {
+    + GRID_SIZE: Number
+    + GAME_DURATION: Number
+    + FOOD_PROBABILITIES: Object
+    + SCORE_PER_FOOD: Number
+    --
+    + getInstance(): GameConfig
+    + updateFoodSpawnConfig(interval, count, maxFood)
+}
+
+class Direction <<Enumeration>> {
+    UP
+    DOWN
+    LEFT
+    RIGHT
+}
+
+class Achievement {
+    - id: String
+    - name: String
+    - unlocked: Boolean
+    --
+    + check(stats): Boolean
+}
+
+' ========== 关系定义 ==========
+
+' 核心组合关系
+Game *-- "1" GameSession : 管理会话
+Game *-- "2" Snake : 管理蛇
+Game o-- "0..1" AIController : 使用AI
+
+' 用户与统计
+GameSession o-- "1..2" User : 关联玩家
+User *-- "1" GameStats : 包含统计
+User o-- "*" Achievement : 拥有成就
+Snake --> User : 归属
+
+' 实体关系
+Snake *-- "*" Position : 身体组成
+Snake o-- "*" SnakeEffect : 附加效果
+Food *-- "1" Position : 位置
+
+' 食物继承
+Food <|-- NormalFood
+Food <|-- SpeedFood
+Food <|-- SuperFood
+Food <|-- MineFood
+Food <|-- MagnetFood
+
+' AI继承
+AIController <|-- EasyAI
+AIController <|-- NormalAI
+AIController <|-- HardAI
+
+' 管理器依赖
+Game ..> FoodSpawner : 使用
+Game ..> CollisionDetector : 使用
+Game ..> RespawnManager : 使用
+Game ..> ScoreManager : 使用
+Game ..> Timer : 使用
+Game ..> AchievementSystem : 使用
+Game ..> Renderer : 使用
+Game ..> UIManager : 使用
+Game ..> InputHandler : 使用
+Game ..> UserManager : 使用
+
+FoodSpawner --> FoodFactory : 创建食物
+FoodSpawner o-- "*" Food : 管理食物
+
+RespawnManager ..> CollisionDetector : 检测安全位置
+
+' 配置依赖
+Game ..> GameConfig : 配置
+Snake ..> Direction : 使用
+
+@enduml

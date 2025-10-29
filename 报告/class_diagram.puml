@@ -1,0 +1,579 @@
+@startuml 蛇对蛇游戏类图
+
+left to right direction
+!pragma layout smetana
+
+title 蛇对蛇游戏 - 核心业务逻辑类图
+' 基于需求分析报告与用例建模，聚焦核心业务逻辑
+
+' 样式配置
+skinparam classAttributeIconSize 0
+skinparam groupInheritance 3
+skinparam linetype ortho
+skinparam nodesep 60
+skinparam ranksep 80
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+' 字体配置
+skinparam defaultFontSize 11
+skinparam classFontSize 12
+skinparam packageFontSize 13
+
+' 颜色配置
+skinparam class {
+    BackgroundColor<<主动对象>> LightYellow
+    BackgroundColor<<单例>> LightBlue
+    BackgroundColor<<Strategy>> LightGreen
+    BackgroundColor<<值对象>> WhiteSmoke
+    BorderColor Black
+    ArrowColor DarkSlateGray
+}
+
+skinparam package {
+    BackgroundColor AliceBlue
+    BorderColor SteelBlue
+    FontStyle bold
+}
+
+' ============================================
+' 核心控制层 - 对应UC4-UC8: 游戏控制与进行
+' ============================================
+package "核心控制层" <<Rectangle>> {
+    class Game <<主动对象>> {
+        - state: string
+        - snakes: Snake[2]
+        - timer: Timer
+        - session: GameSession
+        --
+        ' UC1/UC3: 会话配置
+        + setupSession(session: GameSession): void
+        --
+        ' UC4: 开始游戏
+        + start(): void
+        ' UC5: 暂停/继续游戏
+        + pause(): void
+        + resume(): void
+        ' UC6: 重置游戏
+        + reset(): void
+        ' UC8: 游戏进行（主循环）
+        - update(deltaTime: number): void
+        + end(): void
+        --
+        ' 核心业务协调
+        - handleCollisions(): void
+        - handleFoodCollision(): void
+        - processDeath(snake: Snake): void
+    }
+    
+    class Timer {
+        - timeRemaining: number
+        - isRunning: boolean
+        --
+        ' UC8: 2分钟倒计时监控
+        + start(): void
+        + pause(): void
+        + reset(): void
+        + tick(deltaTime: number): void
+        + getTimeRemaining(): number
+        + isExpired(): boolean
+    }
+    
+    note right of Timer
+        限时对局 120 秒
+        暂停时保留剩余时间
+    end note
+    
+    class GameSession {
+        - mode: string
+        - player1User: User
+        - player2User: User
+        - difficulty: string
+        - speedSetting: number
+        --
+        ' UC1: 选择游戏模式
+        + setupSinglePlayer(user: User, diff: string): void
+        + setupTwoPlayers(u1: User, u2: User): void
+        ' UC2: 设置游戏速度
+        + configureSpeed(value: number): void
+        + isAIMode(): boolean
+        + isValid(): boolean
+    }
+    
+    note right of Game
+        主动对象：游戏主控制器
+        状态机：ready → playing ⇄ paused → over
+        协调所有核心业务用例的执行
+    end note
+}
+
+' ============================================
+' 游戏实体层 - 对应领域模型
+' ============================================
+package "游戏实体层" <<Rectangle>> {
+    class Snake {
+        - body: Position[]
+        - direction: Direction
+        - isAlive: boolean
+        - foodEaten: number
+        - speedMultiplier: number
+        - effects: SnakeEffect[]
+        --
+        ' UC7: 控制蛇移动
+        + move(): void
+        + changeDirection(dir: Direction): void
+        --
+        ' UC10: 死亡与重生
+        + die(type: string): void
+        + respawn(pos: Position, dir: Direction): void
+        + getDropFoodCount(): number
+        --
+        ' 特效管理
+        + addEffect(effect: SnakeEffect): void
+        + updateEffects(game: Game): void
+        + removeExpiredEffects(): void
+        --
+        ' 查询方法
+        + getSpeed(): number
+        + getHead(): Position
+        + getBody(): Position[]
+        + isAlive(): boolean
+    }
+    
+    abstract class Food {
+        # position: Position
+        # type: string
+        --
+        ' UC9: 吃豆子核心逻辑
+        + {abstract} onEaten(snake: Snake, game: Game): void
+        + getPosition(): Position
+    }
+    
+    class NormalFood {
+        - growthAmount: number
+        --
+        + onEaten(snake: Snake, game: Game): void
+    }
+    
+    class SpeedFood {
+        ' UC11: 加速效果
+        - speedMultiplier: number
+        - effectDuration: number
+        --
+        + onEaten(snake: Snake, game: Game): void
+    }
+    
+    class SuperFood {
+        ' UC12: 超级豆子效果
+        - bonusFoodCount: number
+        --
+        + onEaten(snake: Snake, game: Game): void
+    }
+    
+    class MineFood {
+        ' UC13: 触碰地雷
+        - fatalOnTouch: boolean
+        --
+        + onEaten(snake: Snake, game: Game): void
+    }
+    
+    class MagnetFood {
+        ' UC14: 磁铁吸取效果
+        - magnetRange: number
+        - magnetDuration: number
+        --
+        + onEaten(snake: Snake, game: Game): void
+    }
+    
+    abstract class SnakeEffect {
+        # duration: number
+        # type: string
+        --
+        + {abstract} apply(snake: Snake): void
+        + {abstract} remove(snake: Snake): void
+        + update(snake: Snake, game: Game): void
+        + isExpired(): boolean
+    }
+    
+    class SpeedEffect {
+        - speedMultiplier: number
+        --
+        + apply(snake: Snake): void
+        + remove(snake: Snake): void
+    }
+    
+    class MagnetEffect {
+        - range: number
+        --
+        + apply(snake: Snake): void
+        + remove(snake: Snake): void
+        + collectNearbyFood(snake: Snake, game: Game): number
+    }
+    
+    note bottom of Snake
+        核心业务对象：
+        - 移动控制与方向变更
+        - 死亡触发与重生处理
+        - 特效状态管理
+        - 统计数据累积
+    end note
+    
+    note right of Food
+        策略模式：不同食物类型
+        实现不同的吃豆效果
+        对应UC9的扩展用例
+    end note
+}
+
+' ============================================
+' 业务逻辑层 - 算法复杂的核心服务
+' ============================================
+package "业务逻辑层" <<Rectangle>> {
+    class CollisionDetector <<单例>> {
+        - arenaWidth: number
+        - arenaHeight: number
+        --
+        ' UC19: 碰撞检测（持续监控）
+        + checkWallCollision(snake: Snake): boolean
+        + checkSelfCollision(snake: Snake): boolean
+        + checkHeadToHeadCollision(s1: Snake, s2: Snake): boolean
+        + checkFoodCollision(snake: Snake, foods: Food[]): Food
+        + checkBodyCollision(head: Position, body: Position[]): boolean
+        + {static} getInstance(): CollisionDetector
+    }
+    
+    class FoodSpawner {
+        - maxFood: number
+        - spawnRate: number
+        - factory: FoodFactory
+        - activeFoods: Food[]
+        --
+        ' UC18: 豆子刷新（系统自动行为）
+        + spawnFood(): void
+        + startSpawning(): void
+        + stopSpawning(): void
+        + canSpawn(): boolean
+        --
+        ' UC21: 死亡掉落豆子
+        + dropFoodFromSnake(snake: Snake): void
+    }
+    
+    class FoodFactory {
+        - probabilities: Map<string, number>
+        --
+        + createFood(position: Position): Food
+        + createFoodByType(type: string, pos: Position): Food
+        - selectFoodType(): string
+    }
+    
+    class RespawnManager {
+        - respawnDelay: number
+        --
+        ' UC10: 处理死亡与重生（复杂算法）
+        + handleDeath(snake: Snake, game: Game): void
+        + scheduleRespawn(snake: Snake, game: Game): void
+        - findSafeRespawnPosition(game: Game): Position
+        - clearAreaForRespawn(pos: Position, game: Game): void
+        - isPositionSafe(pos: Position, game: Game): boolean
+    }
+    
+    class ScoreManager <<单例>> {
+        - scorePerFood: number
+        - scorePerLength: number
+        --
+        ' UC20: 更新分数（计算逻辑）
+        + calculateScore(snake: Snake): number
+        + determineWinner(snakes: Snake[]): number
+        + getScoreDifference(s1: Snake, s2: Snake): number
+        + {static} getInstance(): ScoreManager
+    }
+    
+    note right of ScoreManager
+        计分规则：食豆数×50 + 蛇长×100
+        支持胜负判定与差距提示
+    end note
+    
+    class AchievementSystem {
+        - achievements: Achievement[]
+        --
+        ' UC16-3: 成就解锁通知
+        + checkAchievements(user: User): Achievement[]
+        + notifyUnlock(achievement: Achievement, user: User): void
+        + trackProgress(user: User): void
+    }
+    
+    note right of CollisionDetector
+        单例模式：全局统一的碰撞检测
+        UC19的核心实现
+    end note
+    
+    note bottom of RespawnManager
+        复杂算法：
+        - 安全位置搜索
+        - 区域清理策略
+        - 掉落豆子分布计算
+    end note
+    
+    note bottom of FoodSpawner
+        系统自动行为：
+        - 定时刷新（每秒2颗）
+        - 数量限制（最多20颗）
+        - 概率分布控制
+    end note
+}
+
+' ============================================
+' AI策略层 - 对应UC22: AI控制蛇移动
+' ============================================
+package "AI策略层" <<Rectangle>> {
+    abstract class AIController <<Strategy>> {
+        # difficulty: string
+        # pathFinder: PathFinder
+        # reactionDelay: number
+        --
+        ' UC22: AI控制蛇移动（算法复杂）
+        + {abstract} makeDecision(snake: Snake, game: Game): Direction
+        # findNearestFood(position: Position, foods: Food[]): Food
+        # getSafeDirections(snake: Snake, game: Game): Direction[]
+        # evaluateDanger(position: Position, game: Game): number
+    }
+    
+    class EasyAI {
+        - randomnessFactor: number
+        --
+        + makeDecision(snake: Snake, game: Game): Direction
+    }
+    
+    class NormalAI {
+        - safetyWeight: number
+        --
+        + makeDecision(snake: Snake, game: Game): Direction
+        - evaluatePosition(pos: Position, game: Game): number
+    }
+    
+    class HardAI {
+        - predictionWindow: number
+        --
+        + makeDecision(snake: Snake, game: Game): Direction
+        - predictOpponentMove(game: Game): Direction
+        - evaluateFutureStates(game: Game): number
+    }
+
+    class PathFinder {
+        - dangerThreshold: number
+        --
+        + evaluateSpace(position: Position, game: Game): number
+        + buildSafePath(start: Position, targets: Position[], snake: Snake): Direction[]
+        + predictOccupation(position: Position, snake: Snake, game: Game): number
+    }
+    
+    note right of PathFinder
+        评估地图危险度与空间余量
+        支持AI决策生成安全路径
+    end note
+    
+    note right of AIController
+        策略模式：不同难度AI
+        依赖路径评估获得安全决策
+        UC22: AI控制蛇移动的实现
+    end note
+}
+
+' ============================================
+' 用户与统计层 - 对应UC0-x: 用户管理
+' ============================================
+package "用户与统计层" <<Rectangle>> {
+    class User {
+        - userId: string
+        - userName: string
+        --
+        ' UC0-4: 查看用户信息
+        + getProfile(): object
+        + getUserId(): string
+        + getUserName(): string
+        + getStats(): GameStats
+        + getAchievements(): Achievement[]
+        --
+        ' 成就管理
+        + unlockAchievement(achievement: Achievement): void
+        + checkAchievements(): Achievement[]
+        --
+        ' 游戏结果
+        + addWin(): void
+        + addLoss(): void
+    }
+    
+    class GameStats {
+        ' 跨局累积统计
+        + totalGames: number
+        + totalWins: number
+        + totalDistance: number
+        + totalFoodEaten: number
+        + totalDeaths: number
+        --
+        ' 单局统计
+        + currentDistance: number
+        + currentFoodEaten: number
+        + currentMaxLength: number
+        --
+        + recordMove(): void
+        + recordFoodEaten(type: string): void
+        + recordDeath(type: string): void
+        + updateMaxLength(length: number): void
+        + endGame(isWin: boolean): void
+        + resetSession(): void
+    }
+    
+    class Achievement {
+        - id: string
+        - name: string
+        - description: string
+        - type: string
+        - requirement: number
+        - progress: number
+        - unlocked: boolean
+        --
+        ' UC16-2: 查看成就进度
+        + checkAndUpdate(stats: GameStats): boolean
+        + getProgress(): number
+        + getProgressPercentage(): number
+        + unlock(): void
+        + isUnlocked(): boolean
+    }
+    
+    class UserManager <<单例>> {
+        - users: Map<string, User>
+        --
+        ' UC0-1: 创建用户
+        + createUser(name: string): User
+        ' UC0-2: 选择用户
+        + getUser(userId: string): User
+        + getAllUsers(): User[]
+        ' UC0-3: 删除用户
+        + deleteUser(userId: string): boolean
+        + userExists(userId: string): boolean
+        + {static} getInstance(): UserManager
+    }
+    
+    note bottom of User
+        用户管理相关用例：
+        UC0-1: 创建用户
+        UC0-2: 选择用户
+        UC0-3: 删除用户
+        UC0-4: 查看用户信息
+    end note
+}
+
+' ============================================
+' 基础数据模型
+' ============================================
+package "基础数据模型" <<Rectangle>> {
+    class Position <<值对象>> {
+        + x: number
+        + y: number
+        --
+        + equals(other: Position): boolean
+        + manhattanDistance(other: Position): number
+        + euclideanDistance(other: Position): number
+        + clone(): Position
+        + toString(): string
+    }
+    
+    class Direction <<值对象>> {
+        + x: number
+        + y: number
+        --
+        + {static} UP: Direction
+        + {static} DOWN: Direction
+        + {static} LEFT: Direction
+        + {static} RIGHT: Direction
+        --
+        + opposite(): Direction
+        + isOpposite(other: Direction): boolean
+    }
+    
+    note right of Position
+        值对象：不可变的坐标
+        表示地图上的位置
+    end note
+    
+    note right of Direction
+        值对象：移动方向
+        包含4个静态常量
+    end note
+}
+
+' ============================================
+' 关系定义
+' ============================================
+
+' === 核心控制层关系 ===
+Game *-- "1" Timer : 包含
+Game *-- "1" GameSession : 包含
+Game *-- "2" Snake : 管理
+Game ..> CollisionDetector : <<use>>
+Game ..> ScoreManager : <<use>>
+Game --> "1" FoodSpawner : 使用
+Game --> "1" RespawnManager : 使用
+Game --> "1" AchievementSystem : 使用
+Game o-- "0..1" AIController : AI模式
+
+GameSession --> "1..2" User : 玩家
+
+' === 游戏实体层关系 ===
+Snake --> "0..1" User : 控制者
+Snake ..> Position : <<use>>
+Snake ..> Direction : <<use>>
+Snake o-- "0..*" SnakeEffect : 激活
+
+Food ..> Position : <<use>>
+Food <|-- NormalFood
+Food <|-- SpeedFood
+Food <|-- SuperFood
+Food <|-- MineFood
+Food <|-- MagnetFood
+
+SnakeEffect <|-- SpeedEffect
+SnakeEffect <|-- MagnetEffect
+
+' === 业务逻辑层关系 ===
+FoodSpawner o-- "1" FoodFactory : 工厂
+FoodSpawner o-- "0..*" Food : 管理
+FoodFactory ..> Food : <<create>>
+
+RespawnManager ..> CollisionDetector : <<use>>
+RespawnManager ..> FoodSpawner : <<use>>
+ScoreManager ..> Snake : <<use>>
+AchievementSystem ..> User : <<use>>
+CollisionDetector ..> Snake : <<use>>
+CollisionDetector ..> Position : <<use>>
+
+' === AI策略层关系 ===
+AIController <|-- EasyAI
+AIController <|-- NormalAI
+AIController <|-- HardAI
+AIController o-- "1" PathFinder : 路径分析
+
+' === 用户与统计层关系 ===
+User *-- "1" GameStats : 统计
+User o-- "0..*" Achievement : 成就
+UserManager o-- "0..*" User : 管理
+
+' === 特效交互 ===
+SnakeEffect ..> Snake : <<modify>>
+SpeedFood ..> SpeedEffect : <<create>>
+MagnetFood ..> MagnetEffect : <<create>>
+
+' === 统计数据流 ===
+Achievement ..> GameStats : <<check>>
+
+' ============================================
+' 布局提示（优化排版）
+' ============================================
+Game -[hidden]right- Snake
+Timer -[hidden]right- GameSession
+CollisionDetector -[hidden]right- FoodSpawner
+User -[hidden]right- GameStats
+Position -[hidden]right- Direction
+
+@enduml
